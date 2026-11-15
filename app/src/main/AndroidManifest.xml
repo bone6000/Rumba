@@ -24,6 +24,10 @@
             android:name=".SettingsActivity"
             android:exported="false"
             android:label="Ajustes" />
+        <activity
+            android:name=".ZonesActivity"
+            android:exported="false"
+            android:label="Mapa y zonas" />
     </application>
 
 </manifest>

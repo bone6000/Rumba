@@ -21,6 +21,14 @@ El APK es de depuración: Gradle lo firma automáticamente con una clave de debu
 
 Conviene dar al robot una IP fija (reserva DHCP en el router). La app se desconecta del robot al salir de la pantalla, para dejar libre la única conexión MQTT que admite.
 
+## Mapa y zonas
+
+- Al terminar la **primera limpieza completa con la app abierta**, el recorrido se guarda como mapa. Los datos quedan solo en el móvil.
+- El botón ▦ de la pantalla principal abre **Mapa y zonas**: arrastra el dedo sobre el mapa para dibujar una zona y ponle nombre (Salón, Cocina…).
+- Tras cada limpieza completa, cada zona muestra el porcentaje que cubrió el robot.
+- Si el primer mapa no salió bien, usa **Usar la última limpieza como mapa**, o **Borrar mapa** para empezar de nuevo.
+- Limitaciones: el 960 no guarda mapas propios ni acepta órdenes de limpiar una zona, así que las zonas sirven para ver la cobertura, no para mandar al robot. El mapa es una trayectoria, sin paredes, y solo encaja entre limpiezas si el robot arranca siempre desde la base.
+
 ## Avisos
 
 - No está probada contra un robot real. El punto más delicado es el TLS antiguo del Roomba (por eso se usa BouncyCastle). Si el estado muestra un error de TLS o de handshake, copia el mensaje exacto.

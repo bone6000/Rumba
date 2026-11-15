@@ -19,6 +19,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import org.json.JSONObject
 import kotlin.math.max
 
@@ -32,7 +33,7 @@ class MainActivity : Activity(), RoombaClient.Listener {
     private lateinit var batteryBar: ProgressBar
     private lateinit var binChip: TextView
     private lateinit var map: MapView
-    private var lastMission = -1
+    private var sawRun = false
     private val ui = Handler(Looper.getMainLooper())
     private val robot = RoombaClient(this)
 
@@ -86,6 +87,14 @@ class MainActivity : Activity(), RoombaClient.Listener {
         statusRow.addView(statusText)
         titles.addView(statusRow)
         header.addView(titles, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val zonesBtn = TextView(this).apply {
+            text = "▦"
+            textSize = 22f
+            gravity = Gravity.CENTER
+            setTextColor(Ui.TEXT)
+            background = Ui.rounded(context, Ui.CARD, 14)
+            setOnClickListener { startActivity(Intent(this@MainActivity, ZonesActivity::class.java)) }
+        }
         val gear = TextView(this).apply {
             text = "⚙"
             textSize = 24f
@@ -94,12 +103,17 @@ class MainActivity : Activity(), RoombaClient.Listener {
             background = Ui.rounded(context, Ui.CARD, 14)
             setOnClickListener { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
         }
+        header.addView(zonesBtn, LinearLayout.LayoutParams(dp(48), dp(48)).apply {
+            rightMargin = dp(10)
+        })
         header.addView(gear, LinearLayout.LayoutParams(dp(48), dp(48)))
         root.addView(header, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
         // Mapa (ocupa todo el espacio libre)
+        MapStore.init(this)
         map = MapView(this)
+        map.setTrail(MapStore.currentPoints())
         val mapCard = FrameLayout(this).apply {
             background = Ui.rounded(context, Ui.CARD, 22)
             clipToOutline = true
@@ -192,8 +206,19 @@ class MainActivity : Activity(), RoombaClient.Listener {
             setOnClickListener { robot.send(command) }
         }
 
+    private fun refreshOverlay() {
+        map.setOverlay(
+            MapStore.referenceCenters(),
+            MapStore.cellSize(),
+            emptyList(),
+            MapStore.zoneList(),
+            emptyMap()
+        )
+    }
+
     override fun onStart() {
         super.onStart()
+        refreshOverlay()
         val ip = prefs.getString("ip", "") ?: ""
         val blid = prefs.getString("blid", "") ?: ""
         val pass = prefs.getString("pass", "") ?: ""
@@ -248,21 +273,30 @@ class MainActivity : Activity(), RoombaClient.Listener {
         binChip.visibility =
             if (state.optJSONObject("bin")?.optBoolean("full", false) == true) View.VISIBLE else View.GONE
 
-        // Nueva misión: se borra el recorrido anterior
+        val phase = mission?.optString("phase") ?: ""
+        val cycle = mission?.optString("cycle") ?: ""
         val nMssn = mission?.optInt("nMssn", -1) ?: -1
-        if (nMssn >= 0) {
-            if (lastMission != -1 && nMssn != lastMission) map.reset()
-            lastMission = nMssn
-        }
 
+        // Posición: se dibuja y se guarda en el móvil
         val pose = state.optJSONObject("pose")
         val pt = pose?.optJSONObject("point")
         if (pose != null && pt != null) {
-            map.update(
-                pt.optDouble("x").toFloat(),
-                pt.optDouble("y").toFloat(),
-                pose.optDouble("theta", 0.0).toFloat()
-            )
+            val x = pt.optDouble("x").toFloat()
+            val y = pt.optDouble("y").toFloat()
+            if (MapStore.addCurrent(x, y, nMssn)) map.reset()
+            map.update(x, y, pose.optDouble("theta", 0.0).toFloat())
+        }
+
+        // Fin de una limpieza completa: se guarda; la primera pasa a ser el mapa
+        if (phase == "run") {
+            sawRun = true
+        } else if (phase == "charge" && cycle == "none" && sawRun) {
+            sawRun = false
+            val savedAsMap = MapStore.finishMission()
+            refreshOverlay()
+            if (savedAsMap) {
+                Toast.makeText(this, "Mapa guardado tras la primera limpieza completa", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
