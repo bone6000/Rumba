@@ -1,6 +1,7 @@
 package com.example.roombalocal
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Bundle
@@ -50,12 +51,20 @@ class MainActivity : Activity(), RoombaClient.Listener {
         passEdit = field(root, "Contraseña del robot", prefs.getString("pass", "") ?: "")
         passEdit.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
 
+        val discoveryRow = row(root)
+        discoveryRow.addView(Button(this).apply {
+            text = "Buscar robot"
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            setOnClickListener { searchRobot() }
+        })
+        discoveryRow.addView(Button(this).apply {
+            text = "Obtener contraseña"
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            setOnClickListener { askPairingMode() }
+        })
+
         root.addView(button("Guardar y conectar") {
-            prefs.edit()
-                .putString("ip", ipEdit.text.toString().trim())
-                .putString("blid", blidEdit.text.toString().trim())
-                .putString("pass", passEdit.text.toString().trim())
-                .apply()
+            saveFields()
             connect()
         })
 
@@ -101,6 +110,89 @@ class MainActivity : Activity(), RoombaClient.Listener {
             return
         }
         robot.connect(ip, blid, pass)
+    }
+
+    private fun saveFields() {
+        prefs.edit()
+            .putString("ip", ipEdit.text.toString().trim())
+            .putString("blid", blidEdit.text.toString().trim())
+            .putString("pass", passEdit.text.toString().trim())
+            .apply()
+    }
+
+    private fun searchRobot() {
+        statusText.text = "Buscando robots en la red…"
+        Thread {
+            val list = try {
+                RoombaDiscovery.discover(this)
+            } catch (e: Exception) {
+                ui.post { statusText.text = "Error buscando: ${e.message}" }
+                return@Thread
+            }
+            ui.post {
+                when {
+                    list.isEmpty() -> statusText.text =
+                        "No se ha encontrado ningún robot. Comprueba que el móvil está en la misma wifi, o escribe la IP a mano."
+                    list.size == 1 -> applyFound(list[0])
+                    else -> {
+                        val names = list.map { "${it.name.ifEmpty { "Roomba" }} · ${it.ip}" }.toTypedArray()
+                        AlertDialog.Builder(this)
+                            .setTitle("Elige el robot")
+                            .setItems(names) { _, i -> applyFound(list[i]) }
+                            .show()
+                    }
+                }
+            }
+        }.start()
+    }
+
+    private fun applyFound(r: FoundRobot) {
+        ipEdit.setText(r.ip)
+        blidEdit.setText(r.blid)
+        saveFields()
+        statusText.text = "Encontrado: ${r.name.ifEmpty { "Roomba" }} (${r.ip})"
+    }
+
+    private fun askPairingMode() {
+        if (ipEdit.text.toString().trim().isEmpty()) {
+            statusText.text = "Primero pulsa Buscar robot o escribe la IP"
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Modo emparejamiento")
+            .setMessage(
+                "1. Cierra la app oficial de iRobot.\n" +
+                    "2. Con el robot en la base y encendido, mantén pulsado HOME " +
+                    "(en el 675, DOCK + SPOT) hasta que suene un tono y parpadee el símbolo wifi; suéltalo.\n" +
+                    "3. Pulsa Continuar enseguida, antes de que pase un minuto."
+            )
+            .setPositiveButton("Continuar") { _, _ -> fetchPassword() }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun fetchPassword() {
+        val ip = ipEdit.text.toString().trim()
+        statusText.text = "Pidiendo la contraseña al robot…"
+        robot.disconnect() // el robot solo admite una conexión a la vez
+        Thread {
+            try {
+                val pw = RoombaDiscovery.fetchPassword(ip)
+                var blid = blidEdit.text.toString().trim()
+                if (blid.isEmpty()) {
+                    blid = RoombaDiscovery.discover(this, 3000).firstOrNull { it.ip == ip }?.blid ?: ""
+                }
+                ui.post {
+                    passEdit.setText(pw)
+                    if (blid.isNotEmpty()) blidEdit.setText(blid)
+                    saveFields()
+                    statusText.text = "Contraseña obtenida y guardada"
+                    connect()
+                }
+            } catch (e: Exception) {
+                ui.post { statusText.text = "No se pudo obtener la contraseña:\n${e.message}" }
+            }
+        }.start()
     }
 
     private fun field(parent: LinearLayout, hint: String, value: String): EditText {

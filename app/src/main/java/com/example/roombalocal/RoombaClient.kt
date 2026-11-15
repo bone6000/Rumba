@@ -1,7 +1,5 @@
 package com.example.roombalocal
 
-import org.bouncycastle.jce.provider.BouncyCastleProvider
-import org.bouncycastle.jsse.provider.BouncyCastleJsseProvider
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken
 import org.eclipse.paho.client.mqttv3.MqttCallback
 import org.eclipse.paho.client.mqttv3.MqttClient
@@ -9,12 +7,7 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions
 import org.eclipse.paho.client.mqttv3.MqttMessage
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import org.json.JSONObject
-import java.security.SecureRandom
-import java.security.cert.X509Certificate
 import java.util.concurrent.Executors
-import javax.net.ssl.SSLContext
-import javax.net.ssl.SSLSocketFactory
-import javax.net.ssl.X509TrustManager
 
 /**
  * Cliente MQTT local para Roomba (series 600/800/900).
@@ -34,20 +27,6 @@ class RoombaClient(private val listener: Listener) {
     @Volatile
     private var client: MqttClient? = null
     private val state = JSONObject()
-
-    // El robot usa un certificado autofirmado y TLS antiguo (AES128-SHA256).
-    // Android no incluye esa suite, así que usamos BouncyCastle JSSE.
-    private fun buildSocketFactory(): SSLSocketFactory {
-        val trustAll = object : X509TrustManager {
-            override fun checkClientTrusted(chain: Array<X509Certificate>?, authType: String?) {}
-            override fun checkServerTrusted(chain: Array<X509Certificate>?, authType: String?) {}
-            override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
-        }
-        val provider = BouncyCastleJsseProvider(BouncyCastleProvider())
-        val ctx = SSLContext.getInstance("TLSv1.2", provider)
-        ctx.init(null, arrayOf(trustAll), SecureRandom())
-        return ctx.socketFactory
-    }
 
     fun connect(ip: String, blid: String, password: String) {
         exec.execute {
@@ -84,7 +63,7 @@ class RoombaClient(private val listener: Listener) {
                     connectionTimeout = 10
                     keepAliveInterval = 30
                     isAutomaticReconnect = false
-                    socketFactory = buildSocketFactory()
+                    socketFactory = LegacyTls.factory
                     isHttpsHostnameVerificationEnabled = false
                 }
                 c.connect(opts)

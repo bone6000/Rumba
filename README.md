@@ -14,11 +14,11 @@ El APK es de depuración: Gradle lo firma automáticamente con una clave de debu
 
 ## Uso
 
-1. Saca el BLID y la contraseña del robot (botón Home hasta el tono, con Home Assistant o `get-roomba-password`).
-2. Pon al robot una IP fija (reserva DHCP en el router).
-3. Abre la app, rellena IP, BLID y contraseña y pulsa "Guardar y conectar".
+1. Abre la app y pulsa **Buscar robot**: rellena la IP y el BLID automáticamente (el móvil tiene que estar en la misma wifi).
+2. Pulsa **Obtener contraseña** y sigue las instrucciones: pon el robot en modo emparejamiento (HOME pulsado hasta el tono) y pulsa Continuar.
+3. La app guarda los datos y se conecta. Si algo falla, también puedes escribir IP, BLID y contraseña a mano.
 
-La app se desconecta del robot al salir, para dejar libre la única conexión MQTT que admite.
+Conviene dar al robot una IP fija (reserva DHCP en el router). La app se desconecta del robot al salir, para dejar libre la única conexión MQTT que admite.
 
 ## Avisos
 
