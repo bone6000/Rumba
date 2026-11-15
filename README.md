@@ -14,11 +14,12 @@ El APK es de depuración: Gradle lo firma automáticamente con una clave de debu
 
 ## Uso
 
-1. Abre la app y pulsa **Buscar robot**: rellena la IP y el BLID automáticamente (el móvil tiene que estar en la misma wifi).
-2. Pulsa **Obtener contraseña** y sigue las instrucciones: pon el robot en modo emparejamiento (HOME pulsado hasta el tono) y pulsa Continuar.
-3. La app guarda los datos y se conecta. Si algo falla, también puedes escribir IP, BLID y contraseña a mano.
+1. Abre la app. La primera vez te lleva a **Ajustes** (también desde el engranaje ⚙ de arriba a la derecha).
+2. En Ajustes pulsa **Buscar robot en la red**: rellena IP y BLID (el móvil tiene que estar en la misma wifi).
+3. Pulsa **Obtener contraseña del robot** y sigue las instrucciones (HOME pulsado hasta el tono). También puedes escribir los tres datos a mano.
+4. Vuelve a la pantalla principal: ves el mapa del recorrido en vivo, batería y estado, con los botones de control debajo.
 
-Conviene dar al robot una IP fija (reserva DHCP en el router). La app se desconecta del robot al salir, para dejar libre la única conexión MQTT que admite.
+Conviene dar al robot una IP fija (reserva DHCP en el router). La app se desconecta del robot al salir de la pantalla, para dejar libre la única conexión MQTT que admite.
 
 ## Avisos
 
