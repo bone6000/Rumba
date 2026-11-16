@@ -96,80 +96,96 @@ object RoombaDiscovery {
         }
     }
 
+    private val PASSWORD_REQUEST = byteArrayOf(0xf0.toByte(), 0x05, 0xef.toByte(), 0xcc.toByte(), 0x3b, 0x29, 0x00)
+    private val UNSUPPORTED_MAGIC = byteArrayOf(0xf0.toByte(), 0x05, 0xef.toByte(), 0xcc.toByte(), 0x3b, 0x29, 0x03)
+
+    /** El robot indica que su contraseña solo se obtiene desde la nube de iRobot. */
+    private class CloudOnlyException : IOException(
+        "Este modelo solo entrega la contraseña desde la nube de iRobot."
+    )
+
     /**
      * Pide la contraseña al robot. Hay que haberlo puesto antes en modo emparejamiento
-     * (HOME pulsado hasta el tono). Se prueban dos variantes del intercambio y
-     * se devuelve la primera que funcione.
+     * (HOME pulsado hasta el tono). Igual que roombapy: TLS primero y la petición dentro del TLS;
+     * como alternativa, el intercambio antiguo (paquete en claro y luego TLS).
      */
     fun fetchPassword(ip: String): String {
-        val packet = byteArrayOf(0xf0.toByte(), 0x05, 0xef.toByte(), 0xcc.toByte(), 0x3b, 0x29, 0x00)
         val errors = mutableListOf<String>()
-        for (variant in listOf("A", "B")) {
+        val variants = listOf("TLS directo", "paquete previo + TLS")
+        for ((i, name) in variants.withIndex()) {
+            if (i > 0) Thread.sleep(2500) // el robot solo atiende una conexión a la vez
             try {
-                val data = if (variant == "A") plainThenTls(ip, packet) else tlsThenPacket(ip, packet)
+                val data = if (i == 0) tlsThenPacket(ip) else plainThenTls(ip)
                 val pw = parsePassword(data)
                 if (pw != null) return pw
-                errors.add("$variant: respuesta de ${data.size} bytes (¿está el robot en modo emparejamiento?)")
+                errors.add("$name: respuesta de ${data.size} bytes (¿está el robot en modo emparejamiento?)")
+            } catch (e: CloudOnlyException) {
+                throw e
             } catch (e: Exception) {
-                errors.add("$variant: ${e.javaClass.simpleName}: ${e.message}")
+                errors.add("$name: ${e.javaClass.simpleName}: ${e.message}")
             }
         }
-        throw IOException(errors.joinToString("\n"))
+        throw IOException(errors.joinToString("\n") + "\n(" + LegacyTls.lastOffered + ")")
     }
 
-    private fun plainThenTls(ip: String, packet: ByteArray): ByteArray {
+    private fun tlsThenPacket(ip: String): ByteArray {
+        val plain = Socket()
+        plain.connect(InetSocketAddress(ip, TLS_PORT), 5000)
+        plain.use {
+            val ssl = LegacyTls.factory.createSocket(it, ip, TLS_PORT, true) as SSLSocket
+            ssl.soTimeout = 4000
+            ssl.startHandshake()
+            ssl.outputStream.apply {
+                write(PASSWORD_REQUEST)
+                flush()
+            }
+            return readFramed(ssl)
+        }
+    }
+
+    // Firmware antiguo: paquete en claro; si la respuesta es corta, se pasa a TLS y se repite.
+    private fun plainThenTls(ip: String): ByteArray {
         val plain = Socket()
         plain.connect(InetSocketAddress(ip, TLS_PORT), 5000)
         plain.soTimeout = 3000
         plain.use {
             it.getOutputStream().apply {
-                write(packet)
+                write(PASSWORD_REQUEST)
                 flush()
             }
+            val buf = ByteArray(1024)
+            val n = try {
+                it.getInputStream().read(buf)
+            } catch (_: SocketTimeoutException) {
+                -1
+            }
+            if (n > 7) return buf.copyOf(n)
             val ssl = LegacyTls.factory.createSocket(it, ip, TLS_PORT, true) as SSLSocket
-            ssl.soTimeout = 3000
-            ssl.startHandshake()
-            return readAll(ssl)
-        }
-    }
-
-    private fun tlsThenPacket(ip: String, packet: ByteArray): ByteArray {
-        val plain = Socket()
-        plain.connect(InetSocketAddress(ip, TLS_PORT), 5000)
-        plain.use {
-            val ssl = LegacyTls.factory.createSocket(it, ip, TLS_PORT, true) as SSLSocket
-            ssl.soTimeout = 3000
+            ssl.soTimeout = 4000
             ssl.startHandshake()
             ssl.outputStream.apply {
-                write(packet)
+                write(PASSWORD_REQUEST)
                 flush()
             }
-            return readAll(ssl)
+            return readFramed(ssl)
         }
     }
 
-    private fun readAll(s: Socket): ByteArray {
+    // La respuesta trae su longitud en el segundo byte: total = longitud + 2.
+    private fun readFramed(s: Socket): ByteArray {
         val out = java.io.ByteArrayOutputStream()
         val buf = ByteArray(1024)
+        var need = 35
         try {
-            while (out.size() < 512) {
+            while (out.size() < need + 2) {
                 val n = s.getInputStream().read(buf)
                 if (n < 0) break
-                out.write(buf, 0, n)
-                if (out.size() > 7) break
+                val chunk = buf.copyOf(n)
+                if (chunk.contentEquals(UNSUPPORTED_MAGIC)) throw CloudOnlyException()
+                out.write(chunk)
+                if (out.size() >= 2) need = out.toByteArray()[1].toInt() and 0xff
             }
         } catch (_: SocketTimeoutException) {
-        }
-        // pequeña espera por si el resto llega en otro segmento
-        try {
-            s.soTimeout = 500
-            while (out.size() < 512) {
-                val n = s.getInputStream().read(buf)
-                if (n < 0) break
-                out.write(buf, 0, n)
-            }
-        } catch (_: SocketTimeoutException) {
-        } catch (_: IOException) {
         }
         return out.toByteArray()
     }
