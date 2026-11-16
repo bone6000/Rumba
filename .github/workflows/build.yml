@@ -42,6 +42,10 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk "roomba-local-$TAG.apk"
-          gh release create "$TAG" "roomba-local-$TAG.apk" \
-            --title "Roomba Local $TAG" \
-            --notes "APK listo para instalar en Android. Descárgalo desde Assets, instálalo permitiendo orígenes desconocidos y sigue el README para configurarlo."
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "roomba-local-$TAG.apk" --clobber
+          else
+            gh release create "$TAG" "roomba-local-$TAG.apk" \
+              --title "Roomba Local $TAG" \
+              --notes "APK listo para instalar en Android. Descárgalo desde Assets, instálalo permitiendo orígenes desconocidos y sigue el README para configurarlo."
+          fi
