@@ -49,3 +49,15 @@ jobs:
               --title "Roomba Local $TAG" \
               --notes "APK listo para instalar en Android. Descárgalo desde Assets, instálalo permitiendo orígenes desconocidos y sigue el README para configurarlo."
           fi
+
+      - name: Publicar release "latest" (cada subida a main)
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk roomba-local.apk
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest roomba-local.apk \
+            --target "$GITHUB_SHA" \
+            --title "Roomba Local (última versión)" \
+            --notes "APK de la última versión de main. Descárgalo desde Assets, instálalo permitiendo orígenes desconocidos y sigue el README para configurarlo. Se actualiza solo con cada cambio."

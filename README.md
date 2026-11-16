@@ -19,12 +19,12 @@ Todo se guarda **solo en el móvil**. La app no envía nada a internet.
 **Opción recomendada: Releases.**
 
 1. Entra en la sección **Releases** de este repositorio (columna derecha de la página principal).
-2. En la versión más reciente, descarga `roomba-local-vX.Y.Z.apk` desde **Assets**.
+2. Abre la release **Roomba Local (última versión)** (etiqueta `latest`, se actualiza sola con cada cambio en `main`) y descarga `roomba-local.apk` desde **Assets**.
 3. Pásalo al móvil y ábrelo. Android pedirá permiso para **instalar apps de orígenes desconocidos**.
 
 Las versiones nuevas se instalan encima de las anteriores sin perder los ajustes ni el mapa.
 
-**Para publicar una versión nueva** basta con crear y subir una etiqueta:
+**Versiones con número (opcional):** al crear una etiqueta que empiece por `v`, el APK también se adjunta a su release:
 
 ```
 git tag v1.1.0
