@@ -15,6 +15,17 @@ android {
         versionName = "1.0"
     }
 
+    // Clave fija (en el repo) para que cada APK nuevo se instale encima del anterior
+    // sin perder los ajustes. No es una clave secreta: no publiques la app en Play Store con ella.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = rootProject.file("roomba.keystore")
+            storePassword = "android"
+            keyAlias = "roomba"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false

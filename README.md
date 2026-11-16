@@ -16,14 +16,24 @@ Todo se guarda **solo en el móvil**. La app no envía nada a internet.
 
 ## 1. Obtener el APK (sin instalar nada en el PC)
 
-El APK se compila en GitHub Actions:
+**Opción recomendada: Releases.**
 
-1. Entra en la pestaña **Actions** de este repositorio.
-2. Abre la última ejecución de **Build APK** con el check verde. Si no hay ninguna reciente, pulsa **Run workflow**.
-3. Al final de la página, en **Artifacts**, descarga `roomba-local-apk` (hace falta iniciar sesión en GitHub). Es un zip con `app-debug.apk`.
-4. Pasa el APK al móvil y ábrelo. Android pedirá permiso para **instalar apps de orígenes desconocidos**.
+1. Entra en la sección **Releases** de este repositorio (columna derecha de la página principal).
+2. En la versión más reciente, descarga `roomba-local-vX.Y.Z.apk` desde **Assets**.
+3. Pásalo al móvil y ábrelo. Android pedirá permiso para **instalar apps de orígenes desconocidos**.
 
-Los artefactos caducan a los 90 días; basta con volver a lanzar el workflow.
+Las versiones nuevas se instalan encima de las anteriores sin perder los ajustes ni el mapa.
+
+**Para publicar una versión nueva** basta con crear y subir una etiqueta:
+
+```
+git tag v1.1.0
+git push origin v1.1.0
+```
+
+GitHub Actions compila el APK y lo publica como release en unos minutos. También se puede crear la etiqueta desde la web, en Releases → Draft a new release.
+
+**Alternativa:** cada subida a `main` genera un APK de prueba en **Actions** → última ejecución → Artifacts (`roomba-local-apk`).
 
 ## 2. Primera configuración
 
