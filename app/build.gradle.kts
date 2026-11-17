@@ -13,7 +13,7 @@ android {
         targetSdk = 34
         // En GitHub Actions cada compilación tiene un número mayor que la anterior
         versionCode = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.plus(100)) ?: 3
-        versionName = "1.2"
+        versionName = "1.3"
     }
 
     // Clave fija (en el repo) para que cada APK nuevo se instale encima del anterior

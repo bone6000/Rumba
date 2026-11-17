@@ -111,7 +111,7 @@ Pulsa ◷ en la pantalla principal para abrir **Programación**.
    - **Respaldo desde el móvil:** 3 minutos después de la hora programada, el móvil se conecta al robot. Si ya está limpiando no hace nada; si no ha empezado, le manda limpiar. El móvil tiene que estar encendido y en la wifi de casa. Si solo usas esta opción, el móvil lanza la limpieza a la hora exacta.
 3. Pulsa **Guardar programación** con la app conectada al robot. Cuando el robot la confirma aparece "✓ Programación guardada en el robot y en el móvil".
 
-En la tarjeta **Robot** se ve la programación que tiene guardada el robot, su reloj y su zona horaria. Sin la nube de iRobot el robot puede perder la hora: si aparece "desfasado", su calendario se disparará a deshoras, pero el respaldo del móvil seguirá yendo a su hora. Si la zona horaria del robot no coincide con la del móvil, aparece un botón para cambiarla (puede que el firmware no la acepte).
+En la tarjeta **Robot** se ve la programación que tiene guardada el robot, su hora local (comparada con la del móvil), si su calendario está en pausa y su zona horaria. Si el robot usa otro desfase horario que el móvil, aparece un aviso que dice cuántas horas antes o después se disparará su calendario. Sin la nube de iRobot el robot puede perder la hora: si aparece "desfasado", su calendario se disparará a deshoras, pero el respaldo del móvil seguirá yendo a su hora. Si la zona horaria del robot no coincide con la del móvil, aparece un botón para cambiarla (puede que el firmware no la acepte).
 
 Para que el respaldo funcione con la pantalla apagada:
 
@@ -154,6 +154,7 @@ app/src/main/java/com/example/roombalocal/
   ScheduleReceiver.kt   alarma y reinicio del móvil
   ScheduleService.kt    respaldo: conecta y manda limpiar si hace falta
   RoombaClient.kt       cliente MQTT local
+  RoombaHub.kt          conexión única compartida por todas las pantallas
   RoombaDiscovery.kt    descubrimiento por UDP y obtención de la contraseña
   LegacyTls.kt          TLS compatible con el robot (BouncyCastle)
   MapStore.kt           mapa, zonas y cobertura guardados en el móvil

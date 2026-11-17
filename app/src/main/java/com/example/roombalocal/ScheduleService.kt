@@ -63,7 +63,7 @@ class ScheduleService : Service() {
     private fun work() {
         val pm = getSystemService(PowerManager::class.java)
         val wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "RoombaLocal:schedule")
-        wl.acquire(150_000L)
+        wl.acquire(240_000L)
         var result: String
         var problem = false
         try {
@@ -104,7 +104,7 @@ class ScheduleService : Service() {
         }
 
         // Si una pantalla de la app ya está conectada, se usa esa conexión.
-        val shared = RoombaClient.active?.takeIf { it.isConnected() }
+        val shared = RoombaClient.active?.takeIf { it.isConnected() } // la conexión de RoombaHub
         if (shared != null) return decideAndStart(shared)
 
         var lastError = ""
@@ -142,9 +142,12 @@ class ScheduleService : Service() {
         }
 
         client.send("start")
-        val started = waitFor(20_000) {
-            val p = client.lastState().optJSONObject("cleanMissionStatus")?.optString("phase")
-            if (p == "run") p else null
+        // El robot puede tardar en informar: se da por empezado si pasa a "run" o abre un ciclo
+        val started = waitFor(60_000) {
+            val m = client.lastState().optJSONObject("cleanMissionStatus")
+            val p = m?.optString("phase") ?: ""
+            val c = m?.optString("cycle") ?: ""
+            if (p == "run" || (c.isNotEmpty() && c != "none")) p else null
         }
         return if (started != null) {
             "Orden de limpiar enviada desde el móvil; el robot ha empezado" to false

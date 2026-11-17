@@ -35,7 +35,6 @@ class ScheduleActivity : Activity(), RoombaClient.Listener {
 
     private lateinit var prefs: SharedPreferences
     private lateinit var sched: Schedule
-    private val robot = RoombaClient(this)
     private val ui = Handler(Looper.getMainLooper())
 
     private val dayToggles = HashMap<Int, TextView>()
@@ -187,12 +186,12 @@ class ScheduleActivity : Activity(), RoombaClient.Listener {
             connText.text = "Configura el robot en Ajustes para poder guardar la programación en él."
             return
         }
-        robot.connect(ip, blid, pass)
+        RoombaHub.attach(this, this)
     }
 
     override fun onStop() {
         super.onStop()
-        robot.disconnect()
+        RoombaHub.detach(this)
     }
 
     // ---------- Construcción de la pantalla ----------
@@ -330,20 +329,20 @@ class ScheduleActivity : Activity(), RoombaClient.Listener {
         val msgs = mutableListOf("Guardada en el móvil.")
 
         if (sched.onRobot) {
-            if (robot.isConnected()) {
+            if (RoombaHub.isConnected()) {
                 waitingRobotConfirm = true
-                robot.sendDelta(JSONObject().put("cleanSchedule", sched.toRobot()), "programación")
+                RoombaHub.sendDelta(JSONObject().put("cleanSchedule", sched.toRobot()), "programación")
                 msgs += "Enviando al robot…"
             } else {
                 msgs += "No hay conexión con el robot: no se ha guardado en él. Vuelve a guardar cuando esté conectado."
             }
-        } else if (robot.isConnected() && Schedule.fromRobot(
+        } else if (RoombaHub.isConnected() && Schedule.fromRobot(
                 lastRobotState?.optJSONObject("cleanSchedule"))?.anyOn() == true
         ) {
             // Se desactivó "Guardar en el robot": se vacía su calendario para que no limpie por su cuenta
             waitingRobotConfirm = true
             val empty = Schedule(sched.days.map { DaySlot(false, it.h, it.m) }, false, sched.onPhone)
-            robot.sendDelta(JSONObject().put("cleanSchedule", empty.toRobot()), "borrar programación del robot")
+            RoombaHub.sendDelta(JSONObject().put("cleanSchedule", empty.toRobot()), "borrar programación del robot")
             msgs += "Borrando la programación del robot…"
         }
         if (sched.onPhone && next != null) askNotifications()
@@ -354,7 +353,7 @@ class ScheduleActivity : Activity(), RoombaClient.Listener {
 
     private fun sendTimezone() {
         val tz = TimeZone.getDefault().id
-        robot.sendDelta(JSONObject().put("timezone", tz), "zona horaria $tz")
+        RoombaHub.sendDelta(JSONObject().put("timezone", tz), "zona horaria $tz")
     }
 
     private fun askNotifications() {
@@ -379,10 +378,8 @@ class ScheduleActivity : Activity(), RoombaClient.Listener {
 
     override fun onStatus(message: String) {
         ui.post {
-            connText.text = when {
-                message == "Conectado" -> "Conectado"
-                else -> message
-            }
+            connText.text = message
+            if (message == "Conectado" && lastRobotState == null) robotInfo.text = "Esperando datos del robot…"
             connText.setTextColor(
                 when {
                     message.startsWith("Conectado") || message.startsWith("Enviado") -> Ui.OK
@@ -422,19 +419,37 @@ class ScheduleActivity : Activity(), RoombaClient.Listener {
                 "✓ Coincide con la de la app" else "≠ Distinta de la de la app (pulsa Guardar)"
         }
 
-        // Reloj del robot
+        // Reloj del robot: hora UTC (utctime) y desfase local (localtimeoffset, en minutos).
+        // El calendario se dispara con la hora LOCAL del robot, así que lo importante es esta.
         if (state.has("utctime")) {
             val robotSec = state.optLong("utctime")
             val diffMin = (robotSec - receivedAt / 1000) / 60
-            val robotTime = SimpleDateFormat("HH:mm", Locale.ROOT).format(Date(robotSec * 1000))
-            lines += if (abs(diffMin) <= 2) {
-                "Reloj del robot: $robotTime ✓"
+            if (abs(diffMin) > 2) lines += "⚠ Reloj UTC del robot desfasado ${abs(diffMin)} min"
+            if (state.has("localtimeoffset")) {
+                val offMin = state.optInt("localtimeoffset")
+                val robotLocal = SimpleDateFormat("HH:mm", Locale.ROOT).apply {
+                    timeZone = TimeZone.getTimeZone("UTC")
+                }.format(Date((robotSec + offMin * 60L) * 1000))
+                val phoneOff = TimeZone.getDefault().getOffset(receivedAt) / 60000
+                val phoneLocal = SimpleDateFormat("HH:mm", Locale.ROOT).format(Date(receivedAt))
+                lines += "Hora local del robot: $robotLocal (móvil: $phoneLocal)"
+                if (offMin != phoneOff) {
+                    val diffH = (phoneOff - offMin) / 60.0
+                    lines += "⚠ El robot usa UTC${fmtOffset(offMin)} y el móvil UTC${fmtOffset(phoneOff)}: " +
+                        "su calendario se dispara ${fmtHours(diffH)} de la hora programada."
+                }
             } else {
-                "Reloj del robot: $robotTime — desfasado ${abs(diffMin)} min. Su calendario se disparará a deshoras; " +
-                    "el respaldo del móvil sí irá a su hora."
+                lines += "Reloj del robot (UTC): " + SimpleDateFormat("HH:mm", Locale.ROOT).apply {
+                    timeZone = TimeZone.getTimeZone("UTC")
+                }.format(Date(robotSec * 1000)) + " — el robot no envía su desfase horario"
             }
         } else {
             lines += "Reloj del robot: sin datos"
+        }
+
+        if (state.has("schedHold")) {
+            lines += if (state.optBoolean("schedHold")) "⚠ Calendario del robot EN PAUSA (schedHold)"
+            else "Calendario del robot activo"
         }
 
         val robotTz = state.optString("timezone", "")
@@ -460,6 +475,17 @@ class ScheduleActivity : Activity(), RoombaClient.Listener {
                 statusText.setTextColor(Ui.OK)
             }
         }
+    }
+
+    private fun fmtOffset(min: Int): String {
+        val sign = if (min < 0) "-" else "+"
+        val a = abs(min)
+        return if (a % 60 == 0) "$sign${a / 60}" else "$sign${a / 60}:${String.format(Locale.ROOT, "%02d", a % 60)}"
+    }
+
+    private fun fmtHours(h: Double): String {
+        val txt = if (h == Math.floor(h)) "${abs(h).toInt()} h" else "${abs(h)} h"
+        return if (h > 0) "$txt después" else "$txt antes"
     }
 
     private fun summary(s: Schedule): String {

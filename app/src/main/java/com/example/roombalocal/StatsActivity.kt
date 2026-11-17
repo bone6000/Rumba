@@ -81,7 +81,6 @@ object Maintenance {
 class StatsActivity : Activity(), RoombaClient.Listener {
 
     private lateinit var prefs: SharedPreferences
-    private val robot = RoombaClient(this)
     private val ui = Handler(Looper.getMainLooper())
 
     private lateinit var connText: TextView
@@ -254,12 +253,12 @@ class StatsActivity : Activity(), RoombaClient.Listener {
             connText.text = "Configura el robot en Ajustes (⚙)"
             return
         }
-        robot.connect(ip, blid, pass)
+        RoombaHub.attach(this, this)
     }
 
     override fun onStop() {
         super.onStop()
-        robot.disconnect()
+        RoombaHub.detach(this)
     }
 
     override fun onStatus(message: String) {

@@ -35,7 +35,6 @@ class MainActivity : Activity(), RoombaClient.Listener {
     private lateinit var map: MapView
     private var sawRun = false
     private val ui = Handler(Looper.getMainLooper())
-    private val robot = RoombaClient(this)
 
     private fun dp(v: Int) = Ui.dp(this, v)
 
@@ -221,7 +220,7 @@ class MainActivity : Activity(), RoombaClient.Listener {
             text = label
             Ui.styleButton(this, bg, fg)
             textSize = 14f
-            setOnClickListener { robot.send(command) }
+            setOnClickListener { RoombaHub.send(command) }
         }
 
     private fun refreshOverlay() {
@@ -249,13 +248,13 @@ class MainActivity : Activity(), RoombaClient.Listener {
             }
             return
         }
-        robot.connect(ip, blid, pass)
+        RoombaHub.attach(this, this)
     }
 
     // Al salir de la pantalla se libera la única conexión MQTT que admite el robot.
     override fun onStop() {
         super.onStop()
-        robot.disconnect()
+        RoombaHub.detach(this)
     }
 
     private fun setStatus(msg: String) {
