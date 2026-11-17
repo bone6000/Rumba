@@ -2,12 +2,16 @@ package com.example.roombalocal
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Typeface
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PersistableBundle
 import android.text.InputType
 import android.view.Gravity
 import android.view.ViewGroup
@@ -25,6 +29,7 @@ class SettingsActivity : Activity() {
     private lateinit var blidEdit: EditText
     private lateinit var passEdit: EditText
     private lateinit var statusText: TextView
+    private var passVisible = false
     private val ui = Handler(Looper.getMainLooper())
 
     private fun dp(v: Int) = Ui.dp(this, v)
@@ -109,6 +114,55 @@ class SettingsActivity : Activity() {
         manual.addView(blidEdit, fieldParams())
         manual.addView(label("Contraseña"))
         manual.addView(passEdit, fieldParams())
+
+        // Ver, copiar y compartir la contraseña (copia de seguridad)
+        val passRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val showBtn = Button(this).apply {
+            text = "Mostrar"
+            Ui.styleButton(this, Ui.CARD2, Ui.TEXT)
+            textSize = 13f
+            setOnClickListener {
+                passVisible = !passVisible
+                applyPassVisibility()
+                text = if (passVisible) "Ocultar" else "Mostrar"
+            }
+        }
+        val copyBtn = Button(this).apply {
+            text = "Copiar"
+            Ui.styleButton(this, Ui.CARD2, Ui.TEXT)
+            textSize = 13f
+            setOnClickListener { copyPassword() }
+        }
+        val shareBtn = Button(this).apply {
+            text = "Compartir"
+            Ui.styleButton(this, Ui.CARD2, Ui.TEXT)
+            textSize = 13f
+            setOnClickListener { shareBackup() }
+        }
+        for ((i, b) in listOf(showBtn, copyBtn, shareBtn).withIndex()) {
+            passRow.addView(b, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                if (i > 0) leftMargin = dp(8)
+            })
+        }
+        manual.addView(passRow, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = dp(10)
+        })
+        manual.addView(hint(
+            "Copia de seguridad: \"Copiar\" copia la contraseña; \"Compartir\" envía IP, BLID y contraseña " +
+                "a donde elijas (gestor de contraseñas, notas…). Para restaurarla, copia ese texto y pulsa " +
+                "\"Pegar copia de seguridad\"."
+        ))
+        val pasteBtn = Button(this).apply {
+            text = "Pegar copia de seguridad"
+            Ui.styleButton(this, Ui.CARD2, Ui.TEXT)
+            textSize = 13f
+            setOnClickListener { pasteBackup() }
+        }
+        manual.addView(pasteBtn, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = dp(10)
+        })
         root.addView(manual, cardParams())
 
         statusText = TextView(this).apply {
@@ -174,6 +228,68 @@ class SettingsActivity : Activity() {
         hint = hintText
         setText(value)
         Ui.styleField(this)
+    }
+
+    private fun applyPassVisibility() {
+        val sel = passEdit.selectionEnd
+        passEdit.inputType = InputType.TYPE_CLASS_TEXT or
+            if (passVisible) InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+            else InputType.TYPE_TEXT_VARIATION_PASSWORD
+        passEdit.setSelection(sel.coerceIn(0, passEdit.text.length))
+    }
+
+    private fun backupText(): String =
+        "Roomba Local — copia de seguridad\n" +
+            "IP: ${ipEdit.text.toString().trim()}\n" +
+            "BLID: ${blidEdit.text.toString().trim()}\n" +
+            "Contraseña: ${passEdit.text.toString().trim()}"
+
+    private fun copyPassword() {
+        val pw = passEdit.text.toString().trim()
+        if (pw.isEmpty()) {
+            statusText.text = "Todavía no hay contraseña."
+            return
+        }
+        val cm = getSystemService(ClipboardManager::class.java)
+        val clip = ClipData.newPlainText("Contraseña Roomba", pw)
+        // Android 13+: no mostrar la contraseña en la vista previa del portapapeles
+        clip.description.extras = PersistableBundle().apply {
+            putBoolean("android.content.extra.IS_SENSITIVE", true)
+        }
+        cm.setPrimaryClip(clip)
+        statusText.text = "Contraseña copiada al portapapeles."
+    }
+
+    private fun shareBackup() {
+        saveFields()
+        if (passEdit.text.toString().trim().isEmpty()) {
+            statusText.text = "Todavía no hay contraseña."
+            return
+        }
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, "Roomba Local — copia de seguridad")
+            putExtra(Intent.EXTRA_TEXT, backupText())
+        }
+        startActivity(Intent.createChooser(send, "Guardar copia de seguridad"))
+    }
+
+    private fun pasteBackup() {
+        val cm = getSystemService(ClipboardManager::class.java)
+        val txt = cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString() ?: ""
+        fun value(key: String) = Regex("(?im)^\\s*$key\\s*:\\s*(.+?)\\s*$").find(txt)?.groupValues?.get(1)
+        val ip = value("IP")
+        val blid = value("BLID")
+        val pw = value("Contrase(?:ñ|n)a") ?: value("Password")
+        if (ip == null && blid == null && pw == null) {
+            statusText.text = "El portapapeles no contiene una copia de seguridad (líneas IP:, BLID: y Contraseña:)."
+            return
+        }
+        ip?.let { ipEdit.setText(it) }
+        blid?.let { blidEdit.setText(it) }
+        pw?.let { passEdit.setText(it) }
+        saveFields()
+        statusText.text = "Copia de seguridad restaurada."
     }
 
     private fun saveFields() {
@@ -249,7 +365,7 @@ class SettingsActivity : Activity() {
                     passEdit.setText(pw)
                     if (blid.isNotEmpty()) blidEdit.setText(blid)
                     saveFields()
-                    statusText.text = "Contraseña obtenida y guardada. Ya puedes volver."
+                    statusText.text = "Contraseña obtenida y guardada. Pulsa Compartir para guardar una copia de seguridad."
                 }
             } catch (e: Exception) {
                 ui.post { statusText.text = "No se pudo obtener la contraseña:\n${e.message}" }

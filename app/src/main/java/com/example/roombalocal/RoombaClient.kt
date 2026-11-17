@@ -17,6 +17,14 @@ import java.util.concurrent.Executors
  */
 class RoombaClient(private val listener: Listener) {
 
+    companion object {
+        /** Cliente conectado ahora mismo desde una pantalla abierta (si lo hay).
+         *  La limpieza programada lo reutiliza para no quitarle al robot su única conexión. */
+        @Volatile
+        var active: RoombaClient? = null
+            private set
+    }
+
     interface Listener {
         fun onStatus(message: String)
         fun onState(state: JSONObject)
@@ -69,6 +77,7 @@ class RoombaClient(private val listener: Listener) {
                 c.connect(opts)
                 c.subscribe("#")
                 client = c
+                active = this
                 listener.onStatus("Conectado")
             } catch (e: Exception) {
                 client = null
@@ -97,11 +106,35 @@ class RoombaClient(private val listener: Listener) {
         }
     }
 
+    /** Cambia ajustes del robot (p. ej. la programación semanal): topic "delta" con {"state": {...}}. */
+    fun sendDelta(desired: JSONObject, label: String) {
+        exec.execute {
+            val c = client
+            if (c == null || !c.isConnected) {
+                listener.onStatus("No conectado")
+                return@execute
+            }
+            try {
+                val payload = JSONObject().put("state", desired)
+                c.publish("delta", MqttMessage(payload.toString().toByteArray()).apply { qos = 0 })
+                listener.onStatus("Enviado: $label")
+            } catch (e: Exception) {
+                listener.onStatus("Error enviando: ${e.message}")
+            }
+        }
+    }
+
+    fun isConnected(): Boolean = client?.isConnected == true
+
+    /** Copia del último estado completo recibido del robot. */
+    fun lastState(): JSONObject = synchronized(state) { JSONObject(state.toString()) }
+
     fun disconnect() {
         exec.execute { disconnectNow() }
     }
 
     private fun disconnectNow() {
+        if (active === this) active = null
         try {
             client?.let {
                 if (it.isConnected) it.disconnect(2000)

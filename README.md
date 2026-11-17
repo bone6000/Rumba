@@ -9,7 +9,9 @@ Pensada para robots cuya nube de iRobot ya no funciona.
 - Iniciar, pausar, reanudar y parar la limpieza, mandar el robot a la base y hacerlo sonar (Localizar).
 - Muestra batería, estado y aviso de depósito lleno.
 - Dibuja en directo el recorrido del robot.
-- Busca el robot en la red y le pide la contraseña, sin tener que sacarla con otras herramientas.
+- Busca el robot en la red y le pide la contraseña, sin tener que sacarla con otras herramientas. La contraseña se puede ver, copiar y guardar como copia de seguridad.
+- Estadísticas: batería, limpieza en curso, historial, errores y cuánto le queda al filtro y a los cepillos.
+- Programa limpiezas por días y horas: se guardan en el propio robot y el móvil hace de respaldo.
 - Guarda el mapa tras la primera limpieza completa, permite nombrar zonas (Salón, Cocina…) y muestra el porcentaje que cubrió la última limpieza en cada una.
 
 Todo se guarda **solo en el móvil**. La app no envía nada a internet.
@@ -49,6 +51,13 @@ Necesitas que el móvil esté en **la misma wifi que el robot**.
 
 También puedes escribir IP, BLID y contraseña a mano en Ajustes.
 
+**Copia de seguridad de la contraseña.** Debajo del campo de contraseña:
+
+- **Mostrar / Ocultar** enseña la contraseña.
+- **Copiar** la copia al portapapeles.
+- **Compartir** envía IP, BLID y contraseña a donde elijas (gestor de contraseñas, notas, correo…).
+- **Pegar copia de seguridad** restaura esos datos: copia el texto que guardaste y pulsa el botón.
+
 **Recomendado:** dale al robot una IP fija con una reserva DHCP en el router, para que no cambie.
 
 ## 3. Uso diario
@@ -79,6 +88,38 @@ La app se desconecta del robot al salir de la pantalla, para dejar libre su úni
 - El 960 no admite órdenes de limpieza por zonas. Las zonas sirven para **ver la cobertura**, no para mandar al robot a una estancia.
 - El fin de limpieza se detecta cuando el robot informa de que carga sin ciclo activo. Si el mapa no se guarda solo, usa el botón manual.
 
+## 5. Estadísticas
+
+Pulsa ⓘ en la pantalla principal (o toca la tarjeta de batería) para abrir **Estadísticas**:
+
+- **Batería:** porcentaje, estado, capacidad estimada, ciclos de carga, horas en la base y fabricante.
+- **Limpieza actual:** fase, tiempo limpiando, superficie, quién la inició, errores y estado del depósito.
+- **Mantenimiento:** horas que le quedan al filtro, cepillo lateral, rodillos y rueda delantera. El 960 no informa del desgaste de las piezas, así que la app lo calcula con sus horas de uso: pulsa **Lo he cambiado** al poner una pieza nueva (o ahora, si está nueva) y el contador empieza de cero. Toca el nombre de una pieza para cambiar su duración. Por defecto: filtro 60 h, cepillo lateral 120 h, rodillos y rueda 250 h (≈ lo que recomienda iRobot limpiando una hora al día).
+- **Historial:** horas y superficie totales, limpiezas terminadas, canceladas y fallidas, veces atascado, zonas sucias detectadas…
+- **Robot:** modelo, firmware, señal wifi, ajustes de limpieza y reloj.
+- **Todos los datos:** todo lo que envía el robot, para verlo o copiarlo.
+
+Solo aparecen los datos que el robot envía; según el firmware pueden faltar algunos.
+
+## 6. Programación
+
+Pulsa ◷ en la pantalla principal para abrir **Programación**.
+
+1. Toca cada día para activarlo y su hora para cambiarla. El 960 admite **una limpieza por día**. **Misma hora para todos** aplica una hora a todos los días activos.
+2. Elige cómo se lanza (puedes dejar las dos opciones activadas, es lo recomendado):
+   - **Guardar en el robot:** el robot limpia solo con su calendario interno, aunque el móvil esté apagado. Hace falta que el robot tenga bien la hora.
+   - **Respaldo desde el móvil:** 3 minutos después de la hora programada, el móvil se conecta al robot. Si ya está limpiando no hace nada; si no ha empezado, le manda limpiar. El móvil tiene que estar encendido y en la wifi de casa. Si solo usas esta opción, el móvil lanza la limpieza a la hora exacta.
+3. Pulsa **Guardar programación** con la app conectada al robot. Cuando el robot la confirma aparece "✓ Programación guardada en el robot y en el móvil".
+
+En la tarjeta **Robot** se ve la programación que tiene guardada el robot, su reloj y su zona horaria. Sin la nube de iRobot el robot puede perder la hora: si aparece "desfasado", su calendario se disparará a deshoras, pero el respaldo del móvil seguirá yendo a su hora. Si la zona horaria del robot no coincide con la del móvil, aparece un botón para cambiarla (puede que el firmware no la acepte).
+
+Para que el respaldo funcione con la pantalla apagada:
+
+- Pulsa **Permitir que funcione en segundo plano** si aparece (quita la optimización de batería para esta app). En algunos móviles (Xiaomi, Huawei, Samsung…) conviene además permitir el inicio automático.
+- Acepta el permiso de notificaciones: solo se avisa si algo falla (robot atascado, sin conexión…). El resultado del último respaldo se ve en la pantalla de Programación.
+
+Si desactivas **Guardar en el robot** y guardas, la app borra el calendario interno del robot para que solo limpie el móvil.
+
 ## Problemas frecuentes
 
 | Síntoma | Qué probar |
@@ -87,6 +128,7 @@ La app se desconecta del robot al salir de la pantalla, para dejar libre su úni
 | No se obtiene la contraseña | Repite el paso del botón HOME y pulsa Continuar más rápido. Cierra la app oficial de iRobot. El mensaje de error indica qué variante falló; cópialo al abrir una incidencia. |
 | Error de TLS o handshake al conectar | El robot usa TLS 1.2 antiguo con certificado autofirmado. Copia el mensaje exacto del estado. |
 | Se conecta pero no responde | Otro cliente puede estar ocupando la única conexión MQTT. Ciérralos y reinicia el robot. |
+| La limpieza programada no arranca | Mira la hora del robot en Programación y el texto "Último respaldo". Comprueba que el móvil sigue en la wifi de casa y que la app no tiene restringida la batería. |
 | El mapa sale vacío | El robot debe enviar su posición mientras limpia. Comprueba que está en una limpieza real, no solo cargando. |
 
 ## Seguridad
@@ -106,6 +148,11 @@ app/src/main/java/com/example/roombalocal/
   MainActivity.kt       pantalla principal: mapa, estado y controles
   SettingsActivity.kt   ajustes, detección del robot y contraseña
   ZonesActivity.kt      mapa guardado, zonas y cobertura
+  StatsActivity.kt      estadísticas y mantenimiento
+  ScheduleActivity.kt   programación semanal
+  Schedule.kt           modelo de la programación y alarmas del móvil
+  ScheduleReceiver.kt   alarma y reinicio del móvil
+  ScheduleService.kt    respaldo: conecta y manda limpiar si hace falta
   RoombaClient.kt       cliente MQTT local
   RoombaDiscovery.kt    descubrimiento por UDP y obtención de la contraseña
   LegacyTls.kt          TLS compatible con el robot (BouncyCastle)

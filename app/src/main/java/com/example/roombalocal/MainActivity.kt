@@ -95,6 +95,22 @@ class MainActivity : Activity(), RoombaClient.Listener {
             background = Ui.rounded(context, Ui.CARD, 14)
             setOnClickListener { startActivity(Intent(this@MainActivity, ZonesActivity::class.java)) }
         }
+        val clock = TextView(this).apply {
+            text = "◷"
+            textSize = 22f
+            gravity = Gravity.CENTER
+            setTextColor(Ui.TEXT)
+            background = Ui.rounded(context, Ui.CARD, 14)
+            setOnClickListener { startActivity(Intent(this@MainActivity, ScheduleActivity::class.java)) }
+        }
+        val statsBtn = TextView(this).apply {
+            text = "ⓘ"
+            textSize = 22f
+            gravity = Gravity.CENTER
+            setTextColor(Ui.TEXT)
+            background = Ui.rounded(context, Ui.CARD, 14)
+            setOnClickListener { startActivity(Intent(this@MainActivity, StatsActivity::class.java)) }
+        }
         val gear = TextView(this).apply {
             text = "⚙"
             textSize = 24f
@@ -103,10 +119,10 @@ class MainActivity : Activity(), RoombaClient.Listener {
             background = Ui.rounded(context, Ui.CARD, 14)
             setOnClickListener { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
         }
-        header.addView(zonesBtn, LinearLayout.LayoutParams(dp(48), dp(48)).apply {
-            rightMargin = dp(10)
-        })
-        header.addView(gear, LinearLayout.LayoutParams(dp(48), dp(48)))
+        for (b in listOf(statsBtn, clock, zonesBtn)) {
+            header.addView(b, LinearLayout.LayoutParams(dp(44), dp(44)).apply { rightMargin = dp(8) })
+        }
+        header.addView(gear, LinearLayout.LayoutParams(dp(44), dp(44)))
         root.addView(header, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 
@@ -165,6 +181,8 @@ class MainActivity : Activity(), RoombaClient.Listener {
             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             topMargin = dp(8)
         })
+        // Tocar la tarjeta de batería abre las estadísticas
+        info.setOnClickListener { startActivity(Intent(this@MainActivity, StatsActivity::class.java)) }
         root.addView(info, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             topMargin = dp(12)
@@ -219,6 +237,7 @@ class MainActivity : Activity(), RoombaClient.Listener {
     override fun onStart() {
         super.onStart()
         refreshOverlay()
+        Scheduler.reschedule(this) // mantiene armada la próxima limpieza programada
         val ip = prefs.getString("ip", "") ?: ""
         val blid = prefs.getString("blid", "") ?: ""
         val pass = prefs.getString("pass", "") ?: ""
@@ -258,6 +277,7 @@ class MainActivity : Activity(), RoombaClient.Listener {
     }
 
     private fun render(state: JSONObject) {
+        Maintenance.observe(this, state)
         val bat = if (state.has("batPct")) state.optInt("batPct") else -1
         batteryText.text = if (bat >= 0) "$bat %" else "— %"
         batteryBar.progress = max(bat, 0)

@@ -11,8 +11,8 @@ android {
         applicationId = "com.example.roombalocal"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 3
+        versionName = "1.2"
     }
 
     // Clave fija (en el repo) para que cada APK nuevo se instale encima del anterior
