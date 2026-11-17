@@ -33,7 +33,6 @@ class MainActivity : Activity(), RoombaClient.Listener {
     private lateinit var batteryBar: ProgressBar
     private lateinit var binChip: TextView
     private lateinit var map: MapView
-    private var sawRun = false
     private val ui = Handler(Looper.getMainLooper())
 
     private fun dp(v: Int) = Ui.dp(this, v)
@@ -248,12 +247,21 @@ class MainActivity : Activity(), RoombaClient.Listener {
             }
             return
         }
+        MapRecorder.onMissionFinished = { savedAsMap ->
+            ui.post {
+                refreshOverlay()
+                if (savedAsMap) {
+                    Toast.makeText(this, "Mapa guardado tras la primera limpieza completa", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
         RoombaHub.attach(this, this)
     }
 
     // Al salir de la pantalla se libera la única conexión MQTT que admite el robot.
     override fun onStop() {
         super.onStop()
+        MapRecorder.onMissionFinished = null
         RoombaHub.detach(this)
     }
 
@@ -292,31 +300,20 @@ class MainActivity : Activity(), RoombaClient.Listener {
         binChip.visibility =
             if (state.optJSONObject("bin")?.optBoolean("full", false) == true) View.VISIBLE else View.GONE
 
-        val phase = mission?.optString("phase") ?: ""
-        val cycle = mission?.optString("cycle") ?: ""
-        val nMssn = mission?.optInt("nMssn", -1) ?: -1
-
-        // Posición: se dibuja y se guarda en el móvil
+        // Recorrido: lo guarda MapRecorder (también en segundo plano); aquí solo se dibuja
+        MapRecorder.process(state)
+        map.setTrail(MapStore.currentPoints())
         val pose = state.optJSONObject("pose")
         val pt = pose?.optJSONObject("point")
         if (pose != null && pt != null) {
-            val x = pt.optDouble("x").toFloat()
-            val y = pt.optDouble("y").toFloat()
-            if (MapStore.addCurrent(x, y, nMssn)) map.reset()
-            map.update(x, y, pose.optDouble("theta", 0.0).toFloat())
+            map.setRobot(
+                pt.optDouble("x").toFloat(),
+                pt.optDouble("y").toFloat(),
+                pose.optDouble("theta", 0.0).toFloat()
+            )
         }
-
-        // Fin de una limpieza completa: se guarda; la primera pasa a ser el mapa
-        if (phase == "run") {
-            sawRun = true
-        } else if (phase == "charge" && cycle == "none" && sawRun) {
-            sawRun = false
-            val savedAsMap = MapStore.finishMission()
-            refreshOverlay()
-            if (savedAsMap) {
-                Toast.makeText(this, "Mapa guardado tras la primera limpieza completa", Toast.LENGTH_LONG).show()
-            }
-        }
+        // Si hay una limpieza en curso, se sigue grabando aunque se apague la pantalla
+        if (MapRecorder.missionActive) MapRecorderService.start(this)
     }
 
     private fun translatePhase(p: String) = when (p) {

@@ -31,6 +31,7 @@ object MapStore {
     private var file: File? = null
     private var loaded = false
 
+    private const val CELL_CM = 12f
     private var cell = 0f
     private var reference: List<P> = emptyList()
     private var refCells: Set<Long> = emptySet()
@@ -76,6 +77,9 @@ object MapStore {
 
     @Synchronized
     fun currentPoints(): List<P> = ArrayList(current)
+
+    @Synchronized
+    fun currentCount(): Int = current.size
 
     /**
      * Se llama cuando la limpieza termina. Guarda el recorrido como "última limpieza" y,
@@ -132,9 +136,8 @@ object MapStore {
             minY = min(minY, p.y)
             maxY = max(maxY, p.y)
         }
-        val extent = max(maxX - minX, maxY - minY)
-        // Celdas del tamaño de ~1/50 del recorrido: el robot cubre unas 3 celdas de ancho.
-        cell = max(extent / 50f, 1f)
+        // Las posiciones del robot vienen en cm. Celdas de 12 cm: el robot (~34 cm) cubre unas 3 de ancho.
+        cell = CELL_CM
         refCells = cells(reference, cell)
     }
 

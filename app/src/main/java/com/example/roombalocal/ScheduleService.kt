@@ -42,6 +42,8 @@ class ScheduleService : Service() {
 
     @Volatile
     private var running = false
+    @Volatile
+    private var cleaningSeen = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -61,6 +63,7 @@ class ScheduleService : Service() {
     }
 
     private fun work() {
+        cleaningSeen = false
         val pm = getSystemService(PowerManager::class.java)
         val wl = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "RoombaLocal:schedule")
         wl.acquire(240_000L)
@@ -88,6 +91,9 @@ class ScheduleService : Service() {
         }
         Scheduler.reschedule(this)
         if (wl.isHeld) wl.release()
+        // Con la limpieza en marcha, se graba el recorrido para el mapa (la conexión de este
+        // servicio ya se ha cerrado, así que no se pisan)
+        if (cleaningSeen) MapRecorderService.start(this)
         running = false
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -135,6 +141,7 @@ class ScheduleService : Service() {
         val cycle = mission?.optString("cycle") ?: ""
 
         if (phase in BUSY || (phase == "charge" && cycle != "none" && cycle.isNotEmpty())) {
+            cleaningSeen = true
             return "El robot ya estaba limpiando (arrancó con su propia programación)" to false
         }
         if (phase == "stuck") {
@@ -149,6 +156,7 @@ class ScheduleService : Service() {
             val c = m?.optString("cycle") ?: ""
             if (p == "run" || (c.isNotEmpty() && c != "none")) p else null
         }
+        if (started != null) cleaningSeen = true
         return if (started != null) {
             "Orden de limpiar enviada desde el móvil; el robot ha empezado" to false
         } else {

@@ -83,6 +83,14 @@ class MapView(context: Context) : View(context) {
         strokeWidth = 2f * density
         pathEffect = android.graphics.DashPathEffect(floatArrayOf(10f * density, 6f * density), 0f)
     }
+    // Franja del ancho del robot (~34 cm) por donde ha pasado
+    private val swathPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Ui.ACCENT
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+        alpha = 70
+    }
     private val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Ui.ACCENT
         style = Paint.Style.STROKE
@@ -139,6 +147,15 @@ class MapView(context: Context) : View(context) {
             lastX = points.last().x
             lastY = points.last().y
         }
+        invalidate()
+    }
+
+    /** Coloca el robot sin añadir puntos al recorrido (el recorrido llega de MapStore). */
+    fun setRobot(x: Float, y: Float, thetaDeg: Float) {
+        theta = thetaDeg
+        lastX = x
+        lastY = y
+        hasPos = true
         invalidate()
     }
 
@@ -284,6 +301,8 @@ class MapView(context: Context) : View(context) {
             path.moveTo(sx(xs[0]), sy(ys[0]))
             for (i in 1 until xs.size) path.lineTo(sx(xs[i]), sy(ys[i]))
             if (hasPos) path.lineTo(sx(lastX), sy(lastY))
+            swathPaint.strokeWidth = max(34f * tScale, 8f * density)
+            canvas.drawPath(path, swathPaint)
             canvas.drawPath(path, trailPaint)
             canvas.drawCircle(sx(xs[0]), sy(ys[0]), 8f * density, dockPaint)
         }

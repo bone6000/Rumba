@@ -60,6 +60,11 @@
         </receiver>
 
         <service
+            android:name=".MapRecorderService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <service
             android:name=".ScheduleService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
