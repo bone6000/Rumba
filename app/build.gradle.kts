@@ -11,7 +11,8 @@ android {
         applicationId = "com.example.roombalocal"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
+        // En GitHub Actions cada compilación tiene un número mayor que la anterior
+        versionCode = (System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()?.plus(100)) ?: 3
         versionName = "1.2"
     }
 

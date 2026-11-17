@@ -21,19 +21,19 @@ Todo se guarda **solo en el móvil**. La app no envía nada a internet.
 **Opción recomendada: Releases.**
 
 1. Entra en la sección **Releases** de este repositorio (columna derecha de la página principal).
-2. Abre la release **Roomba Local (última versión)** (etiqueta `latest`, se actualiza sola con cada cambio en `main`) y descarga `roomba-local.apk` desde **Assets**.
+2. La versión más reciente aparece arriba, marcada como **Latest** (por ejemplo, *Roomba Local 1.2 (build 15)*). Descarga el APK desde **Assets**.
 3. Pásalo al móvil y ábrelo. Android pedirá permiso para **instalar apps de orígenes desconocidos**.
 
-Las versiones nuevas se instalan encima de las anteriores sin perder los ajustes ni el mapa.
+Cada subida a `main` crea una release nueva (`v<versión>-b<compilación>`) y **las anteriores se conservan**, por si necesitas volver a una. Las versiones nuevas se instalan encima sin perder los ajustes ni el mapa.
 
-**Versiones con número (opcional):** al crear una etiqueta que empiece por `v`, el APK también se adjunta a su release:
+**Volver a una versión anterior:** Android no deja instalar un APK más antiguo encima de uno más nuevo. Haz antes una copia de la contraseña (Ajustes → Compartir), desinstala la app, instala el APK antiguo y restaura la copia con **Pegar copia de seguridad**. El mapa, las zonas y la programación se pierden al desinstalar.
+
+**Versiones con número propio (opcional):** al crear una etiqueta que empiece por `v`, el APK también se adjunta a su release:
 
 ```
-git tag v1.1.0
-git push origin v1.1.0
+git tag v1.2.0
+git push origin v1.2.0
 ```
-
-GitHub Actions compila el APK y lo publica como release en unos minutos. También se puede crear la etiqueta desde la web, en Releases → Draft a new release.
 
 **Alternativa:** cada subida a `main` genera un APK de prueba en **Actions** → última ejecución → Artifacts (`roomba-local-apk`).
 
