@@ -50,14 +50,21 @@ jobs:
               --notes "APK listo para instalar en Android. Descárgalo desde Assets, instálalo permitiendo orígenes desconocidos y sigue el README para configurarlo."
           fi
 
-      - name: Publicar release "latest" (cada subida a main)
+      - name: Publicar versión nueva (cada subida a main, sin borrar las anteriores)
         if: github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk roomba-local.apk
-          gh release delete latest --cleanup-tag --yes || true
-          gh release create latest roomba-local.apk \
+          VERSION=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          BUILD=${{ github.run_number }}
+          TAG="v$VERSION-b$BUILD"
+          APK="roomba-local-$VERSION-b$BUILD.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk "$APK"
+          MSG=$(git log -1 --pretty=%s)
+          gh release create "$TAG" "$APK" \
             --target "$GITHUB_SHA" \
-            --title "Roomba Local (última versión)" \
-            --notes "APK de la última versión de main. Descárgalo desde Assets, instálalo permitiendo orígenes desconocidos y sigue el README para configurarlo. Se actualiza solo con cada cambio."
+            --latest \
+            --title "Roomba Local $VERSION (build $BUILD)" \
+            --notes "Cambios: $MSG
+
+          Descarga el APK desde Assets e instálalo encima de la versión anterior. Las versiones antiguas siguen disponibles en Releases."
