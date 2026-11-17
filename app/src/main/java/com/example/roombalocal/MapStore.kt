@@ -31,9 +31,11 @@ object MapStore {
     private var file: File? = null
     private var loaded = false
 
-    private const val CELL_CM = 12f
+    private const val CELL_CM = 8f
+    private const val MAX_HISTORY = 5
     private var cell = 0f
-    private var reference: List<P> = emptyList()
+    /** Últimas limpiezas completas (máx. 5). El mapa se calcula combinándolas. */
+    private val history = ArrayList<List<P>>()
     private var refCells: Set<Long> = emptySet()
     private var last: List<P> = emptyList()
     private val current = ArrayList<P>()
@@ -92,9 +94,11 @@ object MapStore {
         current.clear()
         sinceSave = 0
         var savedAsMap = false
-        if (reference.isEmpty() && last.size >= 40) {
-            setReference(last)
-            savedAsMap = true
+        if (last.size >= 40) {
+            savedAsMap = history.isEmpty()
+            history.add(ArrayList(last))
+            while (history.size > MAX_HISTORY) history.removeAt(0)
+            rebuildReference()
         }
         save()
         return savedAsMap
@@ -103,7 +107,7 @@ object MapStore {
     // ---------- Mapa de referencia ----------
 
     @Synchronized
-    fun hasReference(): Boolean = reference.isNotEmpty()
+    fun hasReference(): Boolean = refCells.isNotEmpty()
 
     @Synchronized
     fun hasLast(): Boolean = last.size >= 10
@@ -111,34 +115,88 @@ object MapStore {
     @Synchronized
     fun useLastAsReference(): Boolean {
         if (last.size < 10) return false
-        setReference(last)
+        history.clear()
+        history.add(ArrayList(last))
+        rebuildReference()
         save()
         return true
     }
 
     @Synchronized
     fun clearReference() {
-        reference = emptyList()
+        history.clear()
         refCells = emptySet()
         cell = 0f
         save()
     }
 
-    private fun setReference(points: List<P>) {
-        reference = ArrayList(points)
-        var minX = Float.MAX_VALUE
-        var maxX = -Float.MAX_VALUE
-        var minY = Float.MAX_VALUE
-        var maxY = -Float.MAX_VALUE
-        for (p in points) {
-            minX = min(minX, p.x)
-            maxX = max(maxX, p.x)
-            minY = min(minY, p.y)
-            maxY = max(maxY, p.y)
+    @Synchronized
+    fun historyCount(): Int = history.size
+
+    /**
+     * Combina las últimas limpiezas: con 3 o más, una celda cuenta como mapa si la han cubierto
+     * al menos 2 (los errores sueltos de posición desaparecen); con menos, vale con 1.
+     * Después se quitan celdas aisladas y se rellenan huecos de una celda.
+     */
+    private fun rebuildReference() {
+        if (history.isEmpty()) {
+            refCells = emptySet()
+            cell = 0f
+            return
         }
-        // Las posiciones del robot vienen en cm. Celdas de 12 cm: el robot (~34 cm) cubre unas 3 de ancho.
         cell = CELL_CM
-        refCells = cells(reference, cell)
+        val counts = HashMap<Long, Int>()
+        for (m in history) for (k in cells(smooth(m), cell)) counts[k] = (counts[k] ?: 0) + 1
+        val need = if (history.size >= 3) 2 else 1
+        val base = HashSet<Long>()
+        for ((k, n) in counts) if (n >= need) base.add(k)
+        refCells = tidy(base)
+    }
+
+    private fun neighbours(set: Set<Long>, k: Long): Int {
+        var n = 0
+        val x = cellX(k)
+        val y = cellY(k)
+        for (dx in -1..1) for (dy in -1..1) if ((dx != 0 || dy != 0) && key(x + dx, y + dy) in set) n++
+        return n
+    }
+
+    private fun tidy(base: Set<Long>): Set<Long> {
+        // 1) fuera celdas sueltas (menos de 2 vecinas)
+        val kept = HashSet<Long>()
+        for (k in base) if (neighbours(base, k) >= 2) kept.add(k)
+        // 2) rellenar huecos: celda vacía con 6 o más vecinas ocupadas
+        val out = HashSet<Long>(kept)
+        val seen = HashSet<Long>()
+        for (k in kept) {
+            val x = cellX(k)
+            val y = cellY(k)
+            for (dx in -1..1) for (dy in -1..1) {
+                val q = key(x + dx, y + dy)
+                if (q in kept || !seen.add(q)) continue
+                if (neighbours(kept, q) >= 6) out.add(q)
+            }
+        }
+        return out
+    }
+
+    /** Suaviza el recorrido (Chaikin): quita las esquinas bruscas que salen de unir puntos muy separados. */
+    private fun smooth(pts: List<P>): List<P> {
+        var p = pts
+        repeat(2) {
+            if (p.size < 3) return p
+            val o = ArrayList<P>(p.size * 2)
+            o.add(p[0])
+            for (i in 0 until p.size - 1) {
+                val a = p[i]
+                val b = p[i + 1]
+                o.add(P(a.x * 0.75f + b.x * 0.25f, a.y * 0.75f + b.y * 0.25f))
+                o.add(P(a.x * 0.25f + b.x * 0.75f, a.y * 0.25f + b.y * 0.75f))
+            }
+            o.add(p[p.size - 1])
+            p = o
+        }
+        return p
     }
 
     @Synchronized
@@ -149,7 +207,7 @@ object MapStore {
 
     @Synchronized
     fun lastCenters(): List<P> =
-        if (cell > 0f && last.isNotEmpty()) centers(cells(last, cell)) else emptyList()
+        if (cell > 0f && last.isNotEmpty()) centers(cells(smooth(last), cell)) else emptyList()
 
     // ---------- Zonas ----------
 
@@ -180,7 +238,7 @@ object MapStore {
     @Synchronized
     fun coverage(): Map<String, Int> {
         if (cell <= 0f || last.isEmpty() || refCells.isEmpty()) return emptyMap()
-        val cur = cells(last, cell)
+        val cur = cells(smooth(last), cell)
         val res = LinkedHashMap<String, Int>()
         for (z in zones) {
             var total = 0
@@ -252,7 +310,9 @@ object MapStore {
         val f = file ?: return
         try {
             val j = JSONObject()
-            j.put("ref", pointsToJson(reference))
+            val ha = JSONArray()
+            for (m in history) ha.put(pointsToJson(m))
+            j.put("hist", ha)
             j.put("last", pointsToJson(last))
             j.put("current", pointsToJson(current))
             j.put("currentMission", currentMission)
@@ -275,8 +335,18 @@ object MapStore {
         val f = file ?: return
         if (!f.exists()) return
         val j = JSONObject(f.readText())
-        val ref = jsonToPoints(j.optJSONArray("ref"))
-        if (ref.isNotEmpty()) setReference(ref)
+        history.clear()
+        val ha = j.optJSONArray("hist")
+        if (ha != null) {
+            for (i in 0 until ha.length()) {
+                val m = jsonToPoints(ha.optJSONArray(i))
+                if (m.isNotEmpty()) history.add(m)
+            }
+        } else {
+            val ref = jsonToPoints(j.optJSONArray("ref"))
+            if (ref.isNotEmpty()) history.add(ref)
+        }
+        rebuildReference()
         last = jsonToPoints(j.optJSONArray("last"))
         current.clear()
         current.addAll(jsonToPoints(j.optJSONArray("current")))

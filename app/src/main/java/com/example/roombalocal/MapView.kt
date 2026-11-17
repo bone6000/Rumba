@@ -301,7 +301,7 @@ class MapView(context: Context) : View(context) {
             path.moveTo(sx(xs[0]), sy(ys[0]))
             for (i in 1 until xs.size) path.lineTo(sx(xs[i]), sy(ys[i]))
             if (hasPos) path.lineTo(sx(lastX), sy(lastY))
-            swathPaint.strokeWidth = max(34f * tScale, 8f * density)
+            swathPaint.strokeWidth = max(26f * tScale, 8f * density)
             canvas.drawPath(path, swathPaint)
             canvas.drawPath(path, trailPaint)
             canvas.drawCircle(sx(xs[0]), sy(ys[0]), 8f * density, dockPaint)
